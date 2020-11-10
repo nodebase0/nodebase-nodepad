@@ -1,0 +1,249 @@
+<!doctype>
+<html>
+  <head>
+    <meta charset='utf-8'> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link type="text/css" rel="stylesheet" href="index.css" />
+    <title>Notepad</title>
+  </head>
+  <body>
+    <div class="item green">NodePad</div>
+    <div id="panel_browser">
+       <div class="item">
+          <input id="txt_dir" type="text" class="input" placeholder="directory path, e.g. /sdcard" />
+       </div>
+       <div><a id="btn_list" class="item-r blue">List</a></div>
+       <div id="view_list"><div class="item red">(No Files)</div></div>
+    </div>
+    <div id="panel_editor" class="hide">
+       <div><a id="btn_back" class="item-r grey">Back</a></div>
+       <div class="item">
+          <input id="txt_file" type="text" class="input" placeholder="file name, e.g. /sdcard/README" />
+       </div>
+       <div><a id="btn_open" class="item-r blue">Open</a></div>
+       <div style="margin: 5px 0 3px 0">
+          <span>
+             <a class="btn btn-default" id="btn_dquote">" "</a>
+             <a class="btn btn-default" id="btn_squote">' '</a>
+             <a class="btn btn-default" id="btn_xbra">( )</a>
+             <a class="btn btn-default" id="btn_ybra">{ }</a>
+             <a class="btn btn-default" id="btn_zbra">&lt; &gt;</a>
+          </span>
+          <span style="margin-left: 20px;"></span>
+          <span>
+             <a class="btn btn-default" id="btn_sel_prev_word">&lt;</a>
+             <a class="btn btn-default" id="btn_sel_word">SelectWord</a>
+             <a class="btn btn-default" id="btn_sel_next_word">&gt;</a>
+          </span>
+       </div>
+       <div>
+          <textarea id="txt_text" rows="10" style="width:100%; font-family:courier,monospace;"></textarea>
+       </div>
+       <br/>
+       <div><a id="btn_save" class="item-r blue">Save</a></div>
+    </div>
+
+    <div class="hide">
+       <div class="item">
+          <select id="sel_plugin" type="text" class="input" placeholder="plugin name"></select>
+       </div>
+       <div><a id="btn_plugin_run" class="item-r grey">Load</a></div>
+       <div><a id="btn_plugin_refresh" class="item-r grey">Refresh</a></div>
+       <div class="container-fluid" id="view_plugin" style="margin-top:10px;"></div>
+    </div>
+    <script type="text/javascript" src="common.js"></script>
+    <script>
+    var word_stop = [
+       ' ', '\t', '\n', '~', '`', '!', '@', '#', '$', '%', '^', '&', '*',
+       '(', ')', '-', '+', '=', '[', ']', '{', '}', '|', '\\', ':', ';',
+       '"', '\'', '<', '>', ',', '.', '/', '?'
+    ];
+
+    function factory_pair_insert(str, cur) {
+       return function (evt) {
+          var c = document.getElementById('txt_text'),
+              s = c.selectionStart,
+              e = c.selectionEnd;
+          console.log(s, e);
+          if (s === e) {
+             c.value = c.value.substring(0, s) + str + c.value.substring(e);
+             c.selectionStart = s + cur;
+             c.selectionEnd = s + cur;
+          } else {
+             c.value = c.value.substring(0, s) +
+                str.substring(0, cur) + c.value.substring(s, e) + str.substring(cur) +
+                c.value.substring(e);
+             c.selectionStart = s - cur + 1;
+             c.selectionEnd = e + str.length - cur + 1;
+          }
+          c.focus();
+       };
+    }
+    $('btn_dquote').on('click', factory_pair_insert('""', 1));
+    $('btn_squote').on('click', factory_pair_insert('\'\'', 1));
+    $('btn_xbra').on('click', factory_pair_insert('()', 1));
+    $('btn_ybra').on('click', factory_pair_insert('{}', 1));
+    $('btn_zbra').on('click', factory_pair_insert('<>', 1));
+
+    function select_word(direction) {
+       var c = document.getElementById('txt_text'),
+           s = c.selectionStart,
+           e = c.selectionEnd,
+           n = c.value.length,
+           forward = false,
+           backward = false;
+       switch (direction) {
+       case 0:
+          if (word_stop.indexOf(c.value.charAt(s)) < 0) {
+             backward = true;
+          }
+          if (word_stop.indexOf(c.value.charAt(e)) < 0) {
+             forward = true;
+          }
+          break;
+       case -1:
+          backward = true;
+          break;
+       case 1:
+          forward = true;
+          break;
+       }
+       if (backward) {
+          if (word_stop.indexOf(c.value.charAt(s-1)) >= 0) {
+             s --;
+          } else {
+             while (s > 0) {
+                if (word_stop.indexOf(c.value.charAt(s-1)) >= 0) break;
+                s --;
+             }
+          }
+          if (s < 0) s = 0;
+       }
+       if (forward) {
+          if (word_stop.indexOf(c.value.charAt(e)) >= 0) {
+             e ++;
+          } else {
+             while (e < n) {
+                e ++;
+                if (word_stop.indexOf(c.value.charAt(e)) >= 0) break;
+             }
+          }
+          if (e > n) e = n;
+       }
+       c.selectionStart = s;
+       c.selectionEnd = e;
+       c.focus();
+    }
+    $('btn_sel_prev_word').on('click', function () { select_word(-1); });
+    $('btn_sel_word').on('click', function () { select_word(0); });
+    $('btn_sel_next_word').on('click', function () { select_word(1); });
+    $('view_list').on('click', function (evt) {
+       if (evt.target.tagName.toLowerCase() !== 'a') return;
+       var txt_dir = document.getElementById('txt_dir'),
+           view_list = document.getElementById('view_list'),
+           one = evt.target.textContent,
+           sp = txt_dir.value.charAt(txt_dir.value.length - 1) === '/'?'':'/';
+       if (one.charAt(one.length - 1) === '/') {
+          txt_dir.value = txt_dir.value + sp + one;
+          clear_element(view_list);
+          view_list.innerHTML = '<div class="item red">(No Files)</div>';
+       } else {
+          document.getElementById('txt_file').value = txt_dir.value + sp + one;
+          document.getElementById('txt_text').value = '';
+          $('panel_browser').classList.add('hide');
+          $('panel_editor').classList.remove('hide');
+       }
+    });
+    $('btn_back').on('click', function (evt) {
+       $('panel_editor').classList.add('hide');
+       $('panel_browser').classList.remove('hide');
+    });
+    $('btn_list').on('click', function (evt) {
+       ajax({
+          url: '/api/nodebase/nodepad/v1/list',
+          json: {
+             path: document.getElementById('txt_dir').value
+          }
+       }, function (data) {
+          var x = document.getElementById('view_list');
+          green_border(document.getElementById('btn_list'));
+          clear_element(x);
+          if (data.files.length + data.dirs.length > 0) {
+             data.dirs.forEach(function (d) {
+                var c = document.createElement('a');
+                c.className = 'item grey';
+                c.appendChild(document.createTextNode(d + '/'));
+                x.appendChild(c);
+             });
+             data.files.forEach(function (f) {
+                var c = document.createElement('a');
+                c.className = 'item blue';
+                c.appendChild(document.createTextNode(f));
+                x.appendChild(c);
+             });
+             {
+                var c = document.createElement('a');
+                c.className = 'item yellow';
+                c.appendChild(document.createTextNode('NewFile'));
+                x.appendChild(c);
+             }
+          } else {
+             x.innerHTML = '<div><a class="item yellow">NewFile</a></div>';
+          }
+       }, function () {
+          red_border(document.getElementById('btn_list'));
+       });
+    });
+    $('btn_open').on('click', function (evt) {
+       ajax({
+          url: '/api/nodebase/nodepad/v1/open',
+          json: {
+             path: document.getElementById('txt_file').value
+          }
+       }, function (data) {
+          green_border(document.getElementById('btn_open'));
+          document.getElementById('txt_text').value = data.text;
+       }, function () {
+          red_border(document.getElementById('btn_open'));
+       });
+    });
+    $('btn_save').on('click', function (evt) {
+       ajax({
+          url: '/api/nodebase/nodepad/v1/save',
+          json: {
+             path: document.getElementById('txt_file').value,
+             text: document.getElementById('txt_text').value
+          }
+       }, function (data) {
+          green_border(document.getElementById('btn_save'));
+       }, function () {
+          red_border(document.getElementById('btn_save'));
+       });
+    });
+
+/*
+    <!-- script type="text/javascript" src="plugin.js" /-->
+    var plugin_subsys = plugin();
+    $('btn_plugin_refresh').on('click', function (evt) {
+       ajax({
+          url: '/api/nodebase/nodepad/v1/plugins'
+       }, function (data) {
+          plugin_subsys.path = data.path;
+          document.getElementById('sel_plugin').innerHTML =
+             data.plugins.map(function (x) {
+                return '<option>' + x + '</option>';
+             }).join('');
+          green_border(evt.target);
+       }, function () {
+          red_border(evt.target);
+       });
+    });
+    $('btn_plugin_run').on('click', function (evt) {
+       var val = document.getElementById('sel_plugin').value;
+       if (!val) return;
+       plugin_subsys.load('__plugin__', '/plugin/' + val + '/index.js', null, true);
+    });
+*/
+    </script>
+  </body>
+</html>

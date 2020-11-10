@@ -1,0 +1,22 @@
+{
+  "name": "nodepad",
+  "version": "0.1.0",
+  "description": "Simple Notepad for Android NodeBase",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "ace-builds": "^1.4.12"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "module",
+    "nodebase",
+    "android",
+    "editor",
+    "notepad"
+  ],
+  "author": "Seven Lju",
+  "license": "MIT"
+}

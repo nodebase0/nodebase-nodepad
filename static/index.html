@@ -1,0 +1,153 @@
+<!doctype>
+<html>
+  <head>
+    <meta charset='utf-8'> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link type="text/css" rel="stylesheet" href="index.css" />
+    <title>Notepad</title>
+  </head>
+  <body>
+    <div class="item green">NodePad</div>
+    <div id="panel_browser">
+       <div class="item">
+          <input id="txt_dir" type="text" class="input" placeholder="directory path, e.g. /sdcard" />
+       </div>
+       <div><a id="btn_list" class="item-r blue">List</a></div>
+       <div id="view_list"><div class="item red">(No Files)</div></div>
+    </div>
+    <div id="panel_editor" class="hide">
+       <div><a id="btn_back" class="item-r grey">Back</a></div>
+       <div class="item">
+          <input id="txt_file" type="text" class="input" placeholder="file name, e.g. /sdcard/README" />
+       </div>
+       <div><a id="btn_open" class="item-r blue">Open</a></div>
+       <div><a id="btn_save" class="item-r blue">Save</a></div>
+       <br/>
+       <div id="txt_text" style="width: 100%; height: 300px; position: absolute;"></div>
+    </div>
+    <script type="text/javascript" src="./ace/ace.js"></script>
+    <script type="text/javascript" src="./ace/mode-javascript.js" charset="utf-8"></script>
+    <script type="text/javascript" src="./ace/mode-html.js" charset="utf-8"></script>
+    <script type="text/javascript" src="./ace/mode-css.js" charset="utf-8"></script>
+    <script type="text/javascript" src="./ace/mode-java.js" charset="utf-8"></script>
+    <script type="text/javascript" src="./ace/mode-c_cpp.js" charset="utf-8"></script>
+    <script type="text/javascript" src="./ace/mode-python.js" charset="utf-8"></script>
+    <script type="text/javascript" src="./ace/mode-ruby.js" charset="utf-8"></script>
+    <script type="text/javascript" src="./ace/mode-json.js" charset="utf-8"></script>
+    <script type="text/javascript" src="common.js"></script>
+    <script>
+    var editor = ace.edit('txt_text');
+    $('view_list').on('click', function (evt) {
+       if (evt.target.tagName.toLowerCase() !== 'a') return;
+       var txt_dir = document.getElementById('txt_dir'),
+           view_list = document.getElementById('view_list'),
+           one = evt.target.textContent,
+           sp = txt_dir.value.charAt(txt_dir.value.length - 1) === '/'?'':'/';
+       if (one.charAt(one.length - 1) === '/') {
+          txt_dir.value = txt_dir.value + sp + one;
+          clear_element(view_list);
+          view_list.innerHTML = '<div class="item red">(No Files)</div>';
+       } else {
+          document.getElementById('txt_file').value = txt_dir.value + sp + one;
+          editor.setValue('');
+          $('panel_browser').classList.add('hide');
+          $('panel_editor').classList.remove('hide');
+       }
+    });
+    $('btn_back').on('click', function (evt) {
+       $('panel_editor').classList.add('hide');
+       $('panel_browser').classList.remove('hide');
+    });
+    $('btn_list').on('click', function (evt) {
+       ajax({
+          url: '/api/nodebase/nodepad/v1/list',
+          json: {
+             path: document.getElementById('txt_dir').value
+          }
+       }, function (data) {
+          var x = document.getElementById('view_list');
+          green_border(document.getElementById('btn_list'));
+          clear_element(x);
+          if (data.files.length + data.dirs.length > 0) {
+             x.innerHTML = '<br/>';
+             data.dirs.forEach(function (d) {
+                var c = document.createElement('a');
+                c.className = 'item grey';
+                c.appendChild(document.createTextNode(d + '/'));
+                x.appendChild(c);
+             });
+             data.files.forEach(function (f) {
+                var c = document.createElement('a');
+                c.className = 'item blue';
+                c.appendChild(document.createTextNode(f));
+                x.appendChild(c);
+             });
+             {
+                var c = document.createElement('a');
+                c.className = 'item yellow';
+                c.appendChild(document.createTextNode('NewFile'));
+                x.appendChild(c);
+             }
+          } else {
+             x.innerHTML = '<div><a class="item yellow">NewFile</a></div>';
+          }
+       }, function () {
+          red_border(document.getElementById('btn_list'));
+       });
+    });
+    $('btn_open').on('click', function (evt) {
+       ajax({
+          url: '/api/nodebase/nodepad/v1/open',
+          json: {
+             path: document.getElementById('txt_file').value
+          }
+       }, function (data) {
+          green_border(document.getElementById('btn_open'));
+          change_mode(document.getElementById('txt_file').value);
+          editor.setValue(data.text);
+       }, function () {
+          red_border(document.getElementById('btn_open'));
+       });
+    });
+    $('btn_save').on('click', function (evt) {
+       ajax({
+          url: '/api/nodebase/nodepad/v1/save',
+          json: {
+             path: document.getElementById('txt_file').value,
+             text: editor.getValue()
+          }
+       }, function (data) {
+          green_border(document.getElementById('btn_save'));
+       }, function () {
+          red_border(document.getElementById('btn_save'));
+       });
+    });
+
+    function change_mode(filename) {
+        var ext = filename.split('.'), mode;
+        if (ext.length === 1) ext = '';
+                         else ext = ext[ext.length - 1];
+        try {
+           switch(ext) {
+           case 'js': mode = 'ace/mode/javascript'; break;
+           case 'html': mode = 'ace/mode/html'; break;
+           case 'css': mode = 'ace/mode/css'; break;
+           case 'java': mode = 'ace/mode/java'; break;
+           case 'py': mode = 'ace/mode/python'; break;
+           case 'rb': mode = 'ace/mode/ruby'; break;
+           case 'go': mode = 'ace/mode/golang'; break;
+           case 'json': mode = 'ace/mode/json'; break;
+           case 'yaml': case: 'yml' mode = 'ace/mode/yaml'; break;
+           case 'c': case 'cpp': case 'cc': case 'h': case 'hpp': case 'hh':
+              mode = 'ace/mode/html'; break;
+           default: mode = 'ace/mode/text';
+           }
+           var changeto = ace.require(mode);
+           editor.session.setMode(new changeto.Mode());
+        } catch (e) {
+           console.log('cannot load mode: ', mode);
+        }
+    }
+    </script>
+  </body>
+</html>
